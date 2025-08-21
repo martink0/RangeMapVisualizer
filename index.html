@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aircraft Range Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #map {
+            height: 100%;
+            min-height: 500px;
+        }
+        /* Style for the assumptions overlay */
+        #assumptions-overlay {
+            position: absolute;
+            bottom: 10px;
+            left: 10px; /* Changed from right to left */
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            max-width: 300px;
+            display: none; /* Hidden by default */
+            white-space: pre-wrap; /* Respects newlines in the text */
+            z-index: 5;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Tailwind CSS Toggle Switch Styling */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #4f46e5;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #4f46e5;
+        }
+        /* Help section styles */
+        #help-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        #help-content.open {
+            max-height: 500px; /* Adjust as needed */
+        }
+        #help-caret {
+            transition: transform 0.3s ease-in-out;
+        }
+        #help-caret.open {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 relative">
+        <!-- Toggle Panel Button -->
+        <button id="toggle-panel-btn" class="absolute top-5 right-5 z-20 bg-white p-2 rounded-full shadow-lg hover:bg-gray-100 transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <svg id="toggle-icon-hide" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+            </svg>
+             <svg id="toggle-icon-show" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+
+        <header class="text-center mb-6">
+            <h1 class="text-4xl font-bold text-gray-900">Aircraft Range Visualizer</h1>
+            <p class="text-lg text-gray-600 mt-2">Enter flight details, generate a scenario, and visualize it on the map.</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+
+            <!-- Control Panel -->
+            <div id="control-panel" class="lg:w-1/3 bg-white p-6 rounded-xl shadow-lg transition-all duration-300">
+                <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Control Panel</h2>
+
+                <!-- Help Section -->
+                <div class="mb-4 border rounded-lg">
+                    <button id="help-button" class="w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 focus:outline-none">
+                        <span class="font-semibold text-gray-700">How to Use This App (Demo)</span>
+                        <svg id="help-caret" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="help-content" class="px-3 pb-3 text-sm text-gray-600">
+                        <p class="mt-2 font-semibold text-gray-800">Please Note:</p>
+                        <p class="mb-3">This is a functional demo created to gather requirements and showcase technical capabilities. The airport data is limited in this version.</p>
+                        
+                        <p class="font-semibold text-gray-800">Instructions:</p>
+                        <ol class="list-decimal list-inside space-y-1 mt-1">
+                            <li><b>Set Departure Airport:</b> Enter the 4-letter ICAO code (e.g., KJFK).</li>
+                            <li><b>Define Range Scenarios:</b> Click "Add Scenario" to create one or more range rings. Each requires a name, a distance in nautical miles (NM), and a color.</li>
+                            <li><b>Add Destinations:</b> Enter a comma-separated list of destination airport ICAO codes.</li>
+                            <li><b>Generate & Render:</b> Click "Generate JSON" to see the data structure, then "Render from JSON" to draw it on the map.</li>
+                        </ol>
+
+                        <p class="mt-3 font-semibold text-gray-800">Map Features:</p>
+                         <ul class="list-disc list-inside space-y-1 mt-1">
+                            <li><b>Flight Arcs:</b> Use the toggle to show/hide flight paths to in-range airports.</li>
+                            <li><b>Hide Panel:</b> Use the button in the top-right to get a full-screen map view.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Map Configuration Section -->
+                <div class="mb-4 p-3 border rounded-lg bg-gray-50">
+                     <h3 class="text-lg font-semibold text-gray-800 mb-3">Map Configuration</h3>
+                     <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">Show Flight Arcs</span>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="show-flight-arcs-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                            <label for="show-flight-arcs-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Departure Airport -->
+                <div class="mb-4">
+                    <label for="departure-icao" class="block text-sm font-medium text-gray-700 mb-1">Departure Airport (ICAO)</label>
+                    <input type="text" id="departure-icao" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., KJFK">
+                </div>
+                
+                <!-- Take-off Assumptions -->
+                <div class="mb-4">
+                    <label for="takeoff-assumptions" class="block text-sm font-medium text-gray-700 mb-1">Take-off Assumptions</label>
+                    <textarea id="takeoff-assumptions" rows="4" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Max takeoff weight, ISA conditions..."></textarea>
+                </div>
+
+                <!-- Range Scenarios -->
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Range Scenarios</h3>
+                    <div id="scenarios-container" class="space-y-4">
+                        <!-- Scenario inputs will be dynamically added here -->
+                    </div>
+                    <button id="add-scenario-btn" class="mt-3 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                        Add Scenario
+                    </button>
+                </div>
+
+                <!-- Destination Airports -->
+                <div class="mb-6">
+                    <label for="destination-icaos" class="block text-sm font-medium text-gray-700 mb-1">Destination Airports (ICAO, comma-separated)</label>
+                    <textarea id="destination-icaos" rows="3" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., KLAX, EGLL, RJAA"></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col space-y-3">
+                     <button id="generate-json-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                        Generate JSON
+                    </button>
+                    <button id="render-map-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                        Render from JSON
+                    </button>
+                </div>
+                 <!-- JSON Output -->
+                <div class="mt-6">
+                    <label for="json-output" class="block text-sm font-medium text-gray-700 mb-1">Scenario JSON</label>
+                    <textarea id="json-output" rows="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 font-mono text-sm" placeholder="JSON output will appear here..."></textarea>
+                </div>
+            </div>
+
+            <!-- Map Display -->
+            <div id="map-container" class="lg:w-2/3 bg-white rounded-xl shadow-lg overflow-hidden relative transition-all duration-300">
+                <div id="map"></div>
+                <div id="assumptions-overlay"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Maps API Script -->
+    <script>
+        // --- DATA & CONFIGURATION ---
+
+        const airportDatabase = {
+            "KJFK": { name: "John F. Kennedy Intl", lat: 40.6413, lng: -73.7781 },
+            "KLAX": { name: "Los Angeles Intl", lat: 33.9416, lng: -118.4085 },
+            "KORD": { name: "O'Hare Intl", lat: 41.9742, lng: -87.9073 },
+            "EGLL": { name: "Heathrow Airport", lat: 51.4700, lng: -0.4543 },
+            "EHAM": { name: "Amsterdam Schiphol", lat: 52.3105, lng: 4.7683 },
+            "RJAA": { name: "Narita Intl", lat: 35.7719, lng: 140.3928 },
+            "OMDB": { name: "Dubai Intl", lat: 25.2532, lng: 55.3657 },
+            "YSSY": { name: "Sydney Airport", lat: -33.9399, lng: 151.1753 },
+            "SBGR": { name: "São Paulo/Guarulhos Intl", lat: -23.4356, lng: -46.4731 },
+            "FAOR": { name: "O. R. Tambo Intl", lat: -26.1392, lng: 28.2460 },
+        };
+
+        // Global variables for map objects to manage state
+        let map;
+        let activeMarkers = [];
+        let activePolygons = [];
+        let activeLabels = [];
+        let activeArcs = [];
+
+        // --- CORE APPLICATION LOGIC ---
+
+        /**
+         * Initializes the Google Map.
+         */
+        function initMap() {
+            const mapOptions = {
+                center: { lat: 20, lng: 0 },
+                zoom: 3,
+                mapTypeId: 'satellite',
+                streetViewControl: false,
+                mapTypeControl: false,
+                fullscreenControl: false,
+            };
+            map = new google.maps.Map(document.getElementById('map'), mapOptions);
+        }
+
+        /**
+         * Clears all overlays from the map.
+         */
+        function clearMap() {
+            activeMarkers.forEach(marker => marker.setMap(null));
+            activePolygons.forEach(polygon => polygon.setMap(null));
+            activeLabels.forEach(label => label.setMap(null));
+            activeArcs.forEach(arc => arc.setMap(null));
+            
+            activeMarkers = [];
+            activePolygons = [];
+            activeLabels = [];
+            activeArcs = [];
+        }
+
+        /**
+         * Creates a marker object.
+         */
+        function createMarker(position, title, pinColor, isDeparture = false) {
+            const markerOptions = {
+                position,
+                map,
+                title
+            };
+
+            if (isDeparture) {
+                markerOptions.icon = {
+                    path: 'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z',
+                    fillColor: '#FFFFFF',
+                    fillOpacity: 1,
+                    strokeWeight: 1.5,
+                    strokeColor: '#000000',
+                    rotation: -45,
+                    scale: 1.3,
+                    anchor: new google.maps.Point(12, 12)
+                };
+            } else {
+                markerOptions.icon = `https://maps.google.com/mapfiles/ms/icons/${pinColor === '4caf50' ? 'green' : 'red'}-dot.png`;
+                markerOptions.label = {
+                    text: title.split('\n')[0],
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                };
+            }
+
+            const marker = new google.maps.Marker(markerOptions);
+            activeMarkers.push(marker);
+            return marker;
+        }
+        
+        /**
+         * Creates a label for a polygon.
+         */
+        function createPolygonLabel(text, position) {
+            const label = new google.maps.Marker({
+                position,
+                map,
+                label: {
+                    text: text,
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                },
+                icon: { path: 'M 0,0' },
+                clickable: false,
+            });
+            activeLabels.push(label);
+        }
+
+        /**
+         * Draws a geodesic flight arc.
+         */
+        function drawFlightArc(start, end) {
+            const arc = new google.maps.Polyline({
+                path: [start, end],
+                geodesic: true,
+                strokeColor: '#FFFFFF',
+                strokeOpacity: 0.7,
+                strokeWeight: 2,
+                icons: [{
+                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+                    offset: '0',
+                    repeat: '15px'
+                }],
+            });
+            arc.setMap(map);
+            activeArcs.push(arc);
+        }
+
+        /**
+         * Generates coordinates for a circle polygon.
+         */
+        function createCirclePolygonCoords(center, radiusNm) {
+            const radiusMeters = radiusNm * 1852;
+            const points = 64;
+            const coords = [];
+            const lat = center.lat * Math.PI / 180;
+            const lng = center.lng * Math.PI / 180;
+
+            for (let i = 0; i < points; i++) {
+                const theta = (i / points) * (2 * Math.PI);
+                const angularDistance = radiusMeters / 6378137;
+                
+                let pointLat = Math.asin(Math.sin(lat) * Math.cos(angularDistance) + Math.cos(lat) * Math.sin(angularDistance) * Math.cos(theta));
+                let pointLng = lng + Math.atan2(Math.sin(theta) * Math.sin(angularDistance) * Math.cos(lat), Math.cos(angularDistance) - Math.sin(lat) * Math.sin(pointLat));
+
+                pointLat = pointLat * 180 / Math.PI;
+                pointLng = pointLng * 180 / Math.PI;
+                
+                coords.push({ lat: pointLat, lng: pointLng });
+            }
+            return coords;
+        }
+
+        /**
+         * Renders the map from the JSON data.
+         */
+        function renderMapFromJSON() {
+            const jsonString = document.getElementById('json-output').value;
+            if (!jsonString) {
+                alert("JSON data is empty. Please generate it first.");
+                return;
+            }
+
+            let data;
+            try {
+                data = JSON.parse(jsonString);
+            } catch (e) {
+                alert("Invalid JSON data. Please check the format.");
+                console.error("JSON Parsing Error:", e);
+                return;
+            }
+
+            clearMap();
+
+            const showArcs = document.getElementById('show-flight-arcs-toggle').checked;
+            const bounds = new google.maps.LatLngBounds();
+
+            const departureAirport = airportDatabase[data.departureIcao];
+            if (!departureAirport) {
+                alert(`Departure airport ${data.departureIcao} not found in database.`);
+                return;
+            }
+            const departurePosition = { lat: departureAirport.lat, lng: departureAirport.lng };
+            
+            const assumptionsOverlay = document.getElementById('assumptions-overlay');
+            let assumptionsText = `Departure Airport: ${departureAirport.name}`;
+            if (data.takeoffAssumptions) {
+                assumptionsText += `\n\n${data.takeoffAssumptions}`;
+            }
+            assumptionsOverlay.innerText = assumptionsText;
+            assumptionsOverlay.style.display = 'block';
+
+            createMarker(departurePosition, departureAirport.name, '4caf50', true);
+            bounds.extend(departurePosition);
+
+            const allAirportPositions = [new google.maps.LatLng(departurePosition)];
+            data.destinations.map(d => d.icao).forEach(icao => {
+                const airport = airportDatabase[icao];
+                if (airport) allAirportPositions.push(new google.maps.LatLng(airport.lat, airport.lng));
+            });
+
+            data.scenarios.forEach(scenario => {
+                let polygonPath;
+                if (scenario.distanceNm) {
+                    polygonPath = createCirclePolygonCoords(departurePosition, scenario.distanceNm);
+                } else if (scenario.coordinates) {
+                    polygonPath = scenario.coordinates;
+                } else return;
+
+                polygonPath.forEach(p => bounds.extend(p));
+                const polygon = new google.maps.Polygon({ paths: polygonPath, strokeColor: scenario.color, strokeOpacity: 0.8, strokeWeight: 3, fillOpacity: 0.0, map: map });
+                activePolygons.push(polygon);
+                
+                let labelPosition;
+                if (scenario.distanceNm) {
+                    let bestAngle = 0, maxMinDistance = 0;
+                    for (let angle = 0; angle < 360; angle += 10) {
+                        const radiusMeters = scenario.distanceNm * 1852;
+                        const candidatePosition = google.maps.geometry.spherical.computeOffset(departurePosition, radiusMeters, angle);
+                        let minDistanceToAnyAirport = Infinity;
+                        allAirportPositions.forEach(airportPos => {
+                            const distance = google.maps.geometry.spherical.computeDistanceBetween(candidatePosition, airportPos);
+                            minDistanceToAnyAirport = Math.min(minDistanceToAnyAirport, distance);
+                        });
+                        if (minDistanceToAnyAirport > maxMinDistance) {
+                            maxMinDistance = minDistanceToAnyAirport;
+                            bestAngle = angle;
+                        }
+                    }
+                    labelPosition = google.maps.geometry.spherical.computeOffset(departurePosition, scenario.distanceNm * 1852, bestAngle);
+                } else if (scenario.coordinates && scenario.coordinates.length > 0) {
+                    labelPosition = scenario.coordinates.reduce((n, c) => c.lat > n.lat ? c : n, scenario.coordinates[0]);
+                } else {
+                    labelPosition = departurePosition;
+                }
+                createPolygonLabel(scenario.name, labelPosition);
+            });
+
+            data.destinations.map(d => d.icao).forEach(icao => {
+                const airport = airportDatabase[icao];
+                if (!airport) {
+                    console.warn(`Destination airport ${icao} not found.`);
+                    return;
+                }
+                const airportPosition = new google.maps.LatLng(airport.lat, airport.lng);
+                bounds.extend(airportPosition);
+                
+                const distanceMeters = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(departurePosition), airportPosition);
+                const distanceNM = (distanceMeters / 1852).toFixed(0);
+                const tooltipTitle = `${airport.name} (${icao})\n${distanceNM} NM`;
+
+                const isInRange = activePolygons.some(polygon => google.maps.geometry.poly.containsLocation(airportPosition, polygon));
+                const pinColor = isInRange ? '4caf50' : 'f44336';
+                createMarker(airportPosition, tooltipTitle, pinColor);
+
+                if (isInRange && showArcs) {
+                    drawFlightArc(departurePosition, airportPosition);
+                }
+            });
+
+            map.fitBounds(bounds);
+            google.maps.event.addListenerOnce(map, 'idle', () => {
+                if (map.getZoom() < 2) map.setZoom(2);
+                map.setCenter(departurePosition);
+            });
+        }
+
+        /**
+         * Dynamically adds a new scenario input group.
+         */
+        function addScenarioInput() {
+            const container = document.getElementById('scenarios-container');
+            const newScenario = document.createElement('div');
+            newScenario.className = 'p-3 border rounded-lg bg-gray-50 scenario-item';
+            newScenario.innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" class="p-2 border rounded-md col-span-2" placeholder="Scenario Name">
+                    <input type="number" class="p-2 border rounded-md" placeholder="Distance (NM)">
+                    <input type="color" class="p-1 h-10 w-full block bg-white border border-gray-200 cursor-pointer rounded-lg" value="#FF0000">
+                </div>
+                <textarea class="w-full p-2 mt-2 border rounded-md text-xs font-mono" rows="2" placeholder="Or paste coordinates: [{lat:..., lng:...}, ...]"></textarea>
+                <button class="remove-scenario-btn text-red-500 hover:text-red-700 text-sm mt-1">Remove</button>
+            `;
+            container.appendChild(newScenario);
+            newScenario.querySelector('.remove-scenario-btn').addEventListener('click', () => newScenario.remove());
+        }
+        
+        /**
+         * Gathers data from the form and generates the JSON.
+         */
+        function generateJsonFromForm() {
+            const departureIcao = document.getElementById('departure-icao').value.toUpperCase();
+            const takeoffAssumptions = document.getElementById('takeoff-assumptions').value;
+            const destinationIcaos = document.getElementById('destination-icaos').value.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            const scenarios = Array.from(document.querySelectorAll('.scenario-item')).map(item => {
+                const name = item.querySelector('input[type="text"]').value;
+                const distance = item.querySelector('input[type="number"]').value;
+                const color = item.querySelector('input[type="color"]').value;
+                const coordsText = item.querySelector('textarea').value;
+                const scenario = { name, color };
+                if (coordsText) {
+                    try { scenario.coordinates = JSON.parse(coordsText); } catch (e) { console.warn('Could not parse coordinates for scenario:', name); }
+                } else if (distance) {
+                    scenario.distanceNm = parseFloat(distance);
+                }
+                return scenario;
+            });
+            const outputData = { 
+                departureIcao, 
+                takeoffAssumptions, 
+                scenarios, 
+                destinations: destinationIcaos.map(icao => ({ icao })) 
+            };
+            document.getElementById('json-output').value = JSON.stringify(outputData, null, 2);
+        }
+
+        // --- EVENT LISTENERS ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            addScenarioInput(); 
+            
+            document.getElementById('add-scenario-btn').addEventListener('click', addScenarioInput);
+            document.getElementById('generate-json-btn').addEventListener('click', generateJsonFromForm);
+            document.getElementById('render-map-btn').addEventListener('click', renderMapFromJSON);
+
+            const togglePanelBtn = document.getElementById('toggle-panel-btn');
+            const controlPanel = document.getElementById('control-panel');
+            const mapContainer = document.getElementById('map-container');
+            const iconHide = document.getElementById('toggle-icon-hide');
+            const iconShow = document.getElementById('toggle-icon-show');
+
+            togglePanelBtn.addEventListener('click', () => {
+                controlPanel.classList.toggle('hidden');
+                iconHide.classList.toggle('hidden');
+                iconShow.classList.toggle('hidden');
+                mapContainer.classList.toggle('lg:w-2/3');
+                mapContainer.classList.toggle('lg:w-full');
+                setTimeout(() => { if (map) google.maps.event.trigger(map, 'resize'); }, 300); 
+            });
+
+            // Help Section Toggle
+            const helpButton = document.getElementById('help-button');
+            const helpContent = document.getElementById('help-content');
+            const helpCaret = document.getElementById('help-caret');
+            helpButton.addEventListener('click', () => {
+                helpContent.classList.toggle('open');
+                helpCaret.classList.toggle('open');
+            });
+
+            document.getElementById('departure-icao').value = 'KJFK';
+            document.getElementById('destination-icaos').value = 'KLAX,EGLL,KORD,EHAM,RJAA,OMDB,YSSY,SBGR,FAOR';
+            const firstScenario = document.querySelector('.scenario-item');
+            firstScenario.querySelector('input[type="text"]').value = 'Max Range';
+            firstScenario.querySelector('input[type="number"]').value = '3000';
+            firstScenario.querySelector('input[type="color"]').value = '#3b82f6';
+        });
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBenOVcAKFVKwwM66oGwPd_CSFX_vBq3_A&callback=initMap&libraries=geometry"></script>
+
+</body>
+</html>
