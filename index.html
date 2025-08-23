@@ -17,8 +17,8 @@
         /* Style for the assumptions overlay */
         #assumptions-overlay {
             position: absolute;
-            bottom: 10px;
-            left: 10px; /* Changed from right to left */
+            top: 10px;
+            right: 10px;
             background-color: rgba(0, 0, 0, 0.6);
             color: white;
             padding: 10px;
@@ -107,9 +107,9 @@
                         <p class="font-semibold text-gray-800">Instructions:</p>
                         <ol class="list-decimal list-inside space-y-1 mt-1">
                             <li><b>Set Departure Airport:</b> Enter the 4-letter ICAO code (e.g., KJFK).</li>
-                            <li><b>Define Range Scenarios:</b> Click "Add Scenario" to create one or more range rings. Each requires a name, a distance in nautical miles (NM), and a color.</li>
+                            <li><b>Define Range Scenarios:</b> Click "Add Scenario" to create one or more range rings.</li>
                             <li><b>Add Destinations:</b> Enter a comma-separated list of destination airport ICAO codes.</li>
-                            <li><b>Generate & Render:</b> Click "Generate JSON" to see the data structure, then "Render from JSON" to draw it on the map.</li>
+                            <li><b>Generate JSON:</b> Click the button to create the scenario. The map will update automatically whenever the JSON text is changed.</li>
                         </ol>
 
                         <p class="mt-3 font-semibold text-gray-800">Map Features:</p>
@@ -166,13 +166,10 @@
                      <button id="generate-json-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                         Generate JSON
                     </button>
-                    <button id="render-map-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
-                        Render from JSON
-                    </button>
                 </div>
                  <!-- JSON Output -->
                 <div class="mt-6">
-                    <label for="json-output" class="block text-sm font-medium text-gray-700 mb-1">Scenario JSON</label>
+                    <label for="json-output" class="block text-sm font-medium text-gray-700 mb-1">Scenario JSON (Map updates automatically on change)</label>
                     <textarea id="json-output" rows="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 font-mono text-sm" placeholder="JSON output will appear here..."></textarea>
                 </div>
             </div>
@@ -347,7 +344,7 @@
         function renderMapFromJSON() {
             const jsonString = document.getElementById('json-output').value;
             if (!jsonString) {
-                alert("JSON data is empty. Please generate it first.");
+                clearMap(); // Clear map if JSON is empty
                 return;
             }
 
@@ -355,8 +352,8 @@
             try {
                 data = JSON.parse(jsonString);
             } catch (e) {
-                alert("Invalid JSON data. Please check the format.");
-                console.error("JSON Parsing Error:", e);
+                // Don't alert on every keystroke, just log the error
+                console.error("Invalid JSON data:", e);
                 return;
             }
 
@@ -365,9 +362,9 @@
             const showArcs = document.getElementById('show-flight-arcs-toggle').checked;
             const bounds = new google.maps.LatLngBounds();
 
-            const departureAirport = airportDatabase[data.departureIcao];
-            if (!departureAirport) {
-                alert(`Departure airport ${data.departureIcao} not found in database.`);
+            const departureAirport = data.departureAirport;
+            if (!departureAirport || !departureAirport.lat) {
+                console.error("Departure airport data is invalid or missing.");
                 return;
             }
             const departurePosition = { lat: departureAirport.lat, lng: departureAirport.lng };
@@ -384,8 +381,7 @@
             bounds.extend(departurePosition);
 
             const allAirportPositions = [new google.maps.LatLng(departurePosition)];
-            data.destinations.map(d => d.icao).forEach(icao => {
-                const airport = airportDatabase[icao];
+            data.destinations.forEach(airport => {
                 if (airport) allAirportPositions.push(new google.maps.LatLng(airport.lat, airport.lng));
             });
 
@@ -426,18 +422,15 @@
                 createPolygonLabel(scenario.name, labelPosition);
             });
 
-            data.destinations.map(d => d.icao).forEach(icao => {
-                const airport = airportDatabase[icao];
-                if (!airport) {
-                    console.warn(`Destination airport ${icao} not found.`);
-                    return;
-                }
+            data.destinations.forEach(airport => {
+                if (!airport) return;
+                
                 const airportPosition = new google.maps.LatLng(airport.lat, airport.lng);
                 bounds.extend(airportPosition);
                 
                 const distanceMeters = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(departurePosition), airportPosition);
                 const distanceNM = (distanceMeters / 1852).toFixed(0);
-                const tooltipTitle = `${airport.name} (${icao})\n${distanceNM} NM`;
+                const tooltipTitle = `${airport.name} (${airport.icao})\n${distanceNM} NM`;
 
                 const isInRange = activePolygons.some(polygon => google.maps.geometry.poly.containsLocation(airportPosition, polygon));
                 const pinColor = isInRange ? '4caf50' : 'f44336';
@@ -476,12 +469,34 @@
         }
         
         /**
-         * Gathers data from the form and generates the JSON.
+         * Gathers data from the form, looks up airport details, and generates the JSON.
          */
         function generateJsonFromForm() {
             const departureIcao = document.getElementById('departure-icao').value.toUpperCase();
+            const departureAirportData = airportDatabase[departureIcao];
+
+            if (!departureAirportData) {
+                alert(`Departure airport '${departureIcao}' not found. Please use a valid 4-letter ICAO code from the demo list.`);
+                return;
+            }
+
             const takeoffAssumptions = document.getElementById('takeoff-assumptions').value;
             const destinationIcaos = document.getElementById('destination-icaos').value.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            
+            const notFoundDestinations = [];
+            const destinations = destinationIcaos.map(icao => {
+                const airportData = airportDatabase[icao];
+                if (!airportData) {
+                    notFoundDestinations.push(icao);
+                    return null;
+                }
+                return { icao, ...airportData };
+            }).filter(d => d !== null);
+
+            if (notFoundDestinations.length > 0) {
+                alert(`The following destination airports were not found and have been skipped: ${notFoundDestinations.join(', ')}`);
+            }
+
             const scenarios = Array.from(document.querySelectorAll('.scenario-item')).map(item => {
                 const name = item.querySelector('input[type="text"]').value;
                 const distance = item.querySelector('input[type="number"]').value;
@@ -495,13 +510,17 @@
                 }
                 return scenario;
             });
+
             const outputData = { 
-                departureIcao, 
+                departureAirport: { icao: departureIcao, ...departureAirportData }, 
                 takeoffAssumptions, 
                 scenarios, 
-                destinations: destinationIcaos.map(icao => ({ icao })) 
+                destinations 
             };
             document.getElementById('json-output').value = JSON.stringify(outputData, null, 2);
+            
+            // Trigger the map render after generating the JSON
+            renderMapFromJSON();
         }
 
         // --- EVENT LISTENERS ---
@@ -511,7 +530,9 @@
             
             document.getElementById('add-scenario-btn').addEventListener('click', addScenarioInput);
             document.getElementById('generate-json-btn').addEventListener('click', generateJsonFromForm);
-            document.getElementById('render-map-btn').addEventListener('click', renderMapFromJSON);
+            
+            // Re-render map on any change to the JSON text area
+            document.getElementById('json-output').addEventListener('input', renderMapFromJSON);
 
             const togglePanelBtn = document.getElementById('toggle-panel-btn');
             const controlPanel = document.getElementById('control-panel');
