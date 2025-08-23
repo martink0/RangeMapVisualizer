@@ -21,13 +21,21 @@
             right: 10px;
             background-color: rgba(0, 0, 0, 0.6);
             color: white;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            max-width: 300px;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.75rem; /* smaller font */
+            max-width: 280px;
             display: none; /* Hidden by default */
             white-space: pre-wrap; /* Respects newlines in the text */
             z-index: 5;
+        }
+        .legend-color-box {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-right: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            vertical-align: middle;
         }
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
@@ -81,28 +89,34 @@
             </svg>
         </button>
 
-        <header class="text-center mb-6">
-            <h1 class="text-4xl font-bold text-gray-900">Aircraft Range Visualizer</h1>
-            <p class="text-lg text-gray-600 mt-2">Enter flight details, generate a scenario, and visualize it on the map.</p>
+        <header class="text-center mb-4">
+            <h1 class="text-3xl font-bold text-gray-900">Aircraft Range Visualizer</h1>
+            <p class="text-base text-gray-600 mt-1">Enter flight details, generate a scenario, and visualize it on the map.</p>
         </header>
 
-        <div class="flex flex-col lg:flex-row gap-6">
+        <div class="flex flex-col lg:flex-row gap-4">
+
+            <!-- Map Display -->
+            <div id="map-container" class="lg:w-2/3 bg-white rounded-xl shadow-lg overflow-hidden relative transition-all duration-300">
+                <div id="map"></div>
+                <div id="assumptions-overlay"></div>
+            </div>
 
             <!-- Control Panel -->
-            <div id="control-panel" class="lg:w-1/3 bg-white p-6 rounded-xl shadow-lg transition-all duration-300">
-                <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Control Panel</h2>
+            <div id="control-panel" class="lg:w-1/3 bg-white p-4 rounded-xl shadow-lg transition-all duration-300">
+                <h2 class="text-xl font-semibold mb-3 border-b pb-2">Control Panel</h2>
 
                 <!-- Help Section -->
-                <div class="mb-4 border rounded-lg">
-                    <button id="help-button" class="w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 focus:outline-none">
-                        <span class="font-semibold text-gray-700">How to Use This App (Demo)</span>
+                <div class="mb-3 border rounded-lg">
+                    <button id="help-button" class="w-full flex justify-between items-center p-2 bg-gray-50 hover:bg-gray-100 focus:outline-none">
+                        <span class="font-semibold text-gray-700 text-sm">How to Use This App (Demo)</span>
                         <svg id="help-caret" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                         </svg>
                     </button>
-                    <div id="help-content" class="px-3 pb-3 text-sm text-gray-600">
+                    <div id="help-content" class="px-2 pb-2 text-xs text-gray-600">
                         <p class="mt-2 font-semibold text-gray-800">Please Note:</p>
-                        <p class="mb-3">This is a functional demo created to gather requirements and showcase technical capabilities. The airport data is limited in this version.</p>
+                        <p class="mb-2">This is a functional demo created to gather requirements and showcase technical capabilities. The airport data is limited in this version.</p>
                         
                         <p class="font-semibold text-gray-800">Instructions:</p>
                         <ol class="list-decimal list-inside space-y-1 mt-1">
@@ -112,7 +126,7 @@
                             <li><b>Generate JSON:</b> Click the button to create the scenario. The map will update automatically whenever the JSON text is changed.</li>
                         </ol>
 
-                        <p class="mt-3 font-semibold text-gray-800">Map Features:</p>
+                        <p class="mt-2 font-semibold text-gray-800">Map Features:</p>
                          <ul class="list-disc list-inside space-y-1 mt-1">
                             <li><b>Flight Arcs:</b> Use the toggle to show/hide flight paths to in-range airports.</li>
                             <li><b>Hide Panel:</b> Use the button in the top-right to get a full-screen map view.</li>
@@ -121,8 +135,8 @@
                 </div>
 
                 <!-- Map Configuration Section -->
-                <div class="mb-4 p-3 border rounded-lg bg-gray-50">
-                     <h3 class="text-lg font-semibold text-gray-800 mb-3">Map Configuration</h3>
+                <div class="mb-3 p-2 border rounded-lg bg-gray-50">
+                     <h3 class="text-base font-semibold text-gray-800 mb-2">Map Configuration</h3>
                      <div class="flex items-center justify-between">
                         <span class="text-sm font-medium text-gray-700">Show Flight Arcs</span>
                         <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
@@ -133,52 +147,47 @@
                 </div>
 
                 <!-- Departure Airport -->
-                <div class="mb-4">
-                    <label for="departure-icao" class="block text-sm font-medium text-gray-700 mb-1">Departure Airport (ICAO)</label>
-                    <input type="text" id="departure-icao" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., KJFK">
+                <div class="mb-3">
+                    <label for="departure-icao" class="block text-xs font-medium text-gray-700 mb-1">Departure Airport (ICAO)</label>
+                    <input type="text" id="departure-icao" class="w-full p-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., KJFK">
                 </div>
                 
                 <!-- Take-off Assumptions -->
-                <div class="mb-4">
-                    <label for="takeoff-assumptions" class="block text-sm font-medium text-gray-700 mb-1">Take-off Assumptions</label>
-                    <textarea id="takeoff-assumptions" rows="4" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Max takeoff weight, ISA conditions..."></textarea>
+                <div class="mb-3">
+                    <label for="takeoff-assumptions" class="block text-xs font-medium text-gray-700 mb-1">Take-off Assumptions</label>
+                    <textarea id="takeoff-assumptions" rows="3" class="w-full p-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Max takeoff weight, ISA conditions..."></textarea>
                 </div>
 
                 <!-- Range Scenarios -->
-                <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Range Scenarios</h3>
-                    <div id="scenarios-container" class="space-y-4">
+                <div class="mb-3">
+                    <h3 class="text-base font-semibold text-gray-800 mb-2">Range Scenarios</h3>
+                    <div id="scenarios-container" class="space-y-2">
                         <!-- Scenario inputs will be dynamically added here -->
                     </div>
-                    <button id="add-scenario-btn" class="mt-3 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                    <button id="add-scenario-btn" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 px-3 text-sm rounded-md transition duration-300">
                         Add Scenario
                     </button>
                 </div>
 
                 <!-- Destination Airports -->
-                <div class="mb-6">
-                    <label for="destination-icaos" class="block text-sm font-medium text-gray-700 mb-1">Destination Airports (ICAO, comma-separated)</label>
-                    <textarea id="destination-icaos" rows="3" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., KLAX, EGLL, RJAA"></textarea>
+                <div class="mb-4">
+                    <label for="destination-icaos" class="block text-xs font-medium text-gray-700 mb-1">Destination Airports (ICAO, comma-separated)</label>
+                    <textarea id="destination-icaos" rows="3" class="w-full p-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., KLAX, EGLL, RJAA"></textarea>
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="flex flex-col space-y-3">
-                     <button id="generate-json-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                <div class="flex flex-col space-y-2">
+                     <button id="generate-json-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 text-sm rounded-md transition duration-300">
                         Generate JSON
                     </button>
                 </div>
                  <!-- JSON Output -->
-                <div class="mt-6">
-                    <label for="json-output" class="block text-sm font-medium text-gray-700 mb-1">Scenario JSON (Map updates automatically on change)</label>
-                    <textarea id="json-output" rows="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 font-mono text-sm" placeholder="JSON output will appear here..."></textarea>
+                <div class="mt-4">
+                    <label for="json-output" class="block text-xs font-medium text-gray-700 mb-1">Scenario JSON (Map updates automatically on change)</label>
+                    <textarea id="json-output" rows="8" class="w-full p-1.5 text-xs border border-gray-300 rounded-md shadow-sm bg-gray-50 font-mono" placeholder="JSON output will appear here..."></textarea>
                 </div>
             </div>
 
-            <!-- Map Display -->
-            <div id="map-container" class="lg:w-2/3 bg-white rounded-xl shadow-lg overflow-hidden relative transition-all duration-300">
-                <div id="map"></div>
-                <div id="assumptions-overlay"></div>
-            </div>
         </div>
     </div>
 
@@ -219,6 +228,16 @@
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: false,
+                // --- MODIFIED: Added restriction to prevent vertical scrolling off the map ---
+                restriction: {
+                    latLngBounds: {
+                        north: 85,
+                        south: -85,
+                        west: -180,
+                        east: 180,
+                    },
+                    strictBounds: false,
+                },
             };
             map = new google.maps.Map(document.getElementById('map'), mapOptions);
         }
@@ -370,11 +389,18 @@
             const departurePosition = { lat: departureAirport.lat, lng: departureAirport.lng };
             
             const assumptionsOverlay = document.getElementById('assumptions-overlay');
-            let assumptionsText = `Departure Airport: ${departureAirport.name}`;
+            
+            let assumptionsHtml = `<strong>Departure Airport:</strong> ${departureAirport.name}`;
             if (data.takeoffAssumptions) {
-                assumptionsText += `\n\n${data.takeoffAssumptions}`;
+                assumptionsHtml += `<br><br><strong>Assumptions:</strong><br>${data.takeoffAssumptions}`;
             }
-            assumptionsOverlay.innerText = assumptionsText;
+            if (data.scenarios && data.scenarios.length > 0) {
+                assumptionsHtml += `<br><br><strong>Scenarios:</strong><br>`;
+                data.scenarios.forEach(scenario => {
+                    assumptionsHtml += `<div><span class="legend-color-box" style="background-color: ${scenario.color};"></span>${scenario.name}</div>`;
+                });
+            }
+            assumptionsOverlay.innerHTML = assumptionsHtml;
             assumptionsOverlay.style.display = 'block';
 
             createMarker(departurePosition, departureAirport.name, '4caf50', true);
@@ -454,15 +480,15 @@
         function addScenarioInput() {
             const container = document.getElementById('scenarios-container');
             const newScenario = document.createElement('div');
-            newScenario.className = 'p-3 border rounded-lg bg-gray-50 scenario-item';
+            newScenario.className = 'p-2 border rounded-lg bg-gray-50 scenario-item';
             newScenario.innerHTML = `
                 <div class="grid grid-cols-2 gap-2">
-                    <input type="text" class="p-2 border rounded-md col-span-2" placeholder="Scenario Name">
-                    <input type="number" class="p-2 border rounded-md" placeholder="Distance (NM)">
-                    <input type="color" class="p-1 h-10 w-full block bg-white border border-gray-200 cursor-pointer rounded-lg" value="#FF0000">
+                    <input type="text" class="p-1.5 text-sm border rounded-md col-span-2" placeholder="Scenario Name">
+                    <input type="number" class="p-1.5 text-sm border rounded-md" placeholder="Distance (NM)">
+                    <input type="color" class="p-1 h-8 w-full block bg-white border border-gray-200 cursor-pointer rounded-lg" value="#FF0000">
                 </div>
-                <textarea class="w-full p-2 mt-2 border rounded-md text-xs font-mono" rows="2" placeholder="Or paste coordinates: [{lat:..., lng:...}, ...]"></textarea>
-                <button class="remove-scenario-btn text-red-500 hover:text-red-700 text-sm mt-1">Remove</button>
+                <textarea class="w-full p-1.5 mt-2 border rounded-md text-xs font-mono" rows="2" placeholder="Or paste coordinates: [{lat:..., lng:...}, ...]"></textarea>
+                <button class="remove-scenario-btn text-red-500 hover:text-red-700 text-xs mt-1">Remove</button>
             `;
             container.appendChild(newScenario);
             newScenario.querySelector('.remove-scenario-btn').addEventListener('click', () => newScenario.remove());
