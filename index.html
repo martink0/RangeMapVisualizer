@@ -29,6 +29,16 @@
             white-space: pre-wrap; /* Respects newlines in the text */
             z-index: 5;
         }
+        #poi-control-container {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 8px;
+            z-index: 5;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
         .legend-color-box {
             display: inline-block;
             width: 10px;
@@ -36,6 +46,11 @@
             margin-right: 6px;
             border: 1px solid rgba(255, 255, 255, 0.5);
             vertical-align: middle;
+        }
+        .scenario-legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2px;
         }
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
@@ -100,6 +115,16 @@
             <div id="map-container" class="lg:w-2/3 bg-white rounded-xl shadow-lg overflow-hidden relative transition-all duration-300">
                 <div id="map"></div>
                 <div id="assumptions-overlay"></div>
+                <!-- POI Selector moved here -->
+                <div id="poi-control-container">
+                    <label for="poi-selector" class="block text-sm font-medium text-gray-700 mb-1">Points of Interest</label>
+                    <select id="poi-selector" class="w-full p-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="none">None</option>
+                        <option value="capitals">Continental Capitals</option>
+                        <option value="in_range">Cities Near Max Range</option>
+                        <option value="hotspots">Wealthy Hotspots</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Control Panel -->
@@ -118,30 +143,39 @@
                         <p class="mt-2 font-semibold text-gray-800">Please Note:</p>
                         <p class="mb-2">This is a functional demo created to gather requirements and showcase technical capabilities. The airport data is limited in this version.</p>
                         
-                        <p class="font-semibold text-gray-800">Instructions:</p>
+                        <p class="font-semibold text-gray-800">Automatic Polygon Styling:</p>
+                        <p class="mb-2">The style of the range rings is now automatic based on the Scenario Name:</p>
+                         <ul class="list-disc list-inside space-y-1 mt-1">
+                            <li><b>Color:</b> Include "Bombardier" for Amber, otherwise it will be Dark Gray.</li>
+                            <li><b>Line Style:</b> The line style is based on order. The 1st scenario for a brand is solid, 2nd is dashed, etc. (up to 4 styles).</li>
+                            <li><b>Example:</b> "Bombardier Global" or "Competitor Jet".</li>
+                         </ul>
+
+                        <p class="mt-2 font-semibold text-gray-800">Instructions:</p>
                         <ol class="list-decimal list-inside space-y-1 mt-1">
                             <li><b>Set Departure Airport:</b> Enter the 4-letter ICAO code (e.g., KJFK).</li>
-                            <li><b>Define Range Scenarios:</b> Click "Add Scenario" to create one or more range rings.</li>
+                            <li><b>Define Range Scenarios:</b> Use the naming convention above. Each scenario can have a primary range and an optional return range.</li>
                             <li><b>Add Destinations:</b> Enter a comma-separated list of destination airport ICAO codes.</li>
                             <li><b>Generate JSON:</b> Click the button to create the scenario. The map will update automatically whenever the JSON text is changed.</li>
                         </ol>
-
-                        <p class="mt-2 font-semibold text-gray-800">Map Features:</p>
-                         <ul class="list-disc list-inside space-y-1 mt-1">
-                            <li><b>Flight Arcs:</b> Use the toggle to show/hide flight paths to in-range airports.</li>
-                            <li><b>Hide Panel:</b> Use the button in the top-right to get a full-screen map view.</li>
-                        </ul>
                     </div>
                 </div>
 
                 <!-- Map Configuration Section -->
                 <div class="mb-3 p-2 border rounded-lg bg-gray-50">
                      <h3 class="text-base font-semibold text-gray-800 mb-2">Map Configuration</h3>
-                     <div class="flex items-center justify-between">
+                     <div class="flex items-center justify-between mb-2">
                         <span class="text-sm font-medium text-gray-700">Show Flight Arcs</span>
                         <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
                             <input type="checkbox" name="toggle" id="show-flight-arcs-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
                             <label for="show-flight-arcs-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                    </div>
+                     <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Show Reference City</span>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="show-cities-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                            <label for="show-cities-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
                         </div>
                     </div>
                 </div>
@@ -196,315 +230,503 @@
         // --- DATA & CONFIGURATION ---
 
         const airportDatabase = {
-            "KJFK": { name: "John F. Kennedy Intl", lat: 40.6413, lng: -73.7781 },
-            "KLAX": { name: "Los Angeles Intl", lat: 33.9416, lng: -118.4085 },
-            "KORD": { name: "O'Hare Intl", lat: 41.9742, lng: -87.9073 },
-            "EGLL": { name: "Heathrow Airport", lat: 51.4700, lng: -0.4543 },
-            "EHAM": { name: "Amsterdam Schiphol", lat: 52.3105, lng: 4.7683 },
-            "RJAA": { name: "Narita Intl", lat: 35.7719, lng: 140.3928 },
-            "OMDB": { name: "Dubai Intl", lat: 25.2532, lng: 55.3657 },
-            "YSSY": { name: "Sydney Airport", lat: -33.9399, lng: 151.1753 },
-            "SBGR": { name: "São Paulo/Guarulhos Intl", lat: -23.4356, lng: -46.4731 },
-            "FAOR": { name: "O. R. Tambo Intl", lat: -26.1392, lng: 28.2460 },
+            "KJFK": { name: "John F. Kennedy Intl", lat: 40.6413, lng: -73.7781 }, "KLAX": { name: "Los Angeles Intl", lat: 33.9416, lng: -118.4085 },
+            "KORD": { name: "O'Hare Intl", lat: 41.9742, lng: -87.9073 }, "EGLL": { name: "Heathrow Airport", lat: 51.4700, lng: -0.4543 },
+            "EHAM": { name: "Amsterdam Schiphol", lat: 52.3105, lng: 4.7683 }, "RJAA": { name: "Narita Intl", lat: 35.7719, lng: 140.3928 },
+            "OMDB": { name: "Dubai Intl", lat: 25.2532, lng: 55.3657 }, "YSSY": { name: "Sydney Airport", lat: -33.9399, lng: 151.1753 },
+            "SBGR": { name: "São Paulo/Guarulhos Intl", lat: -23.4356, lng: -46.4731 }, "FAOR": { name: "O. R. Tambo Intl", lat: -26.1392, lng: 28.2460 },
         };
 
-        // Global variables for map objects to manage state
+        const continentalCapitals = [
+            { name: "Tokyo (Asia)", lat: 35.6895, lng: 139.6917 }, { name: "Cairo (Africa)", lat: 30.0444, lng: 31.2357 },
+            { name: "Mexico City (N. America)", lat: 19.4326, lng: -99.1332 }, { name: "São Paulo (S. America)", lat: -23.5505, lng: -46.6333 },
+            { name: "London (Europe)", lat: 51.5074, lng: -0.1278 }, { name: "Sydney (Oceania)", lat: -33.8688, lng: 151.2093 },
+        ];
+
+        const wealthyHotspots = [
+            { name: "Monaco", lat: 43.7384, lng: 7.4246 }, { name: "Dubai", lat: 25.2048, lng: 55.2708 },
+            { name: "Paris", lat: 48.8566, lng: 2.3522 }, { name: "Martha's Vineyard", lat: 41.3816, lng: -70.6457 },
+            { name: "The Hamptons", lat: 40.9618, lng: -72.3854 }, { name: "Aspen", lat: 39.1911, lng: -106.8175 },
+        ];
+
+        const majorCities = [
+            ...continentalCapitals, { name: "Jakarta", lat: -6.2088, lng: 106.8456 }, { name: "Delhi", lat: 28.7041, lng: 77.1025 },
+            { name: "Shanghai", lat: 31.2304, lng: 121.4737 }, { name: "Beijing", lat: 39.9042, lng: 116.4074 },
+            { name: "Mumbai", lat: 19.0760, lng: 72.8777 }, { name: "Osaka", lat: 34.6937, lng: 135.5023 },
+            { name: "New York", lat: 40.7128, lng: -74.0060 }, { name: "Moscow", lat: 55.7558, lng: 37.6173 },
+        ];
+
+        const BRANDING = {
+            BOMBARDIER_COLOR: '#F3CB02',
+            COMPETITOR_COLOR: '#9F9E9C',
+        };
+
         let map;
         let activeMarkers = [];
+        let activePoiMarkers = [];
         let activePolygons = [];
         let activeLabels = [];
         let activeArcs = [];
+        let scenarioOverlays = [];
+        let currentMapData = null;
 
         // --- CORE APPLICATION LOGIC ---
 
-        /**
-         * Initializes the Google Map.
-         */
         function initMap() {
             const mapOptions = {
-                center: { lat: 20, lng: 0 },
-                zoom: 3,
-                mapTypeId: 'satellite',
-                streetViewControl: false,
-                mapTypeControl: false,
-                fullscreenControl: false,
-                // --- MODIFIED: Added restriction to prevent vertical scrolling off the map ---
-                restriction: {
-                    latLngBounds: {
-                        north: 85,
-                        south: -85,
-                        west: -180,
-                        east: 180,
-                    },
-                    strictBounds: false,
-                },
+                center: { lat: 20, lng: 0 }, zoom: 3, mapTypeId: 'satellite',
+                streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+                restriction: { latLngBounds: { north: 85, south: -85, west: -180, east: 180, }, strictBounds: false, },
             };
             map = new google.maps.Map(document.getElementById('map'), mapOptions);
         }
 
-        /**
-         * Clears all overlays from the map.
-         */
+        function clearPois() {
+            activePoiMarkers.forEach(marker => marker.setMap(null));
+            activePoiMarkers = [];
+        }
+
         function clearMap() {
             activeMarkers.forEach(marker => marker.setMap(null));
             activePolygons.forEach(polygon => polygon.setMap(null));
             activeLabels.forEach(label => label.setMap(null));
             activeArcs.forEach(arc => arc.setMap(null));
-            
-            activeMarkers = [];
-            activePolygons = [];
-            activeLabels = [];
-            activeArcs = [];
+            clearPois();
+            activeMarkers = []; activePolygons = []; activeLabels = []; activeArcs = []; scenarioOverlays = [];
         }
 
-        /**
-         * Creates a marker object.
-         */
-        function createMarker(position, title, pinColor, isDeparture = false) {
-            const markerOptions = {
-                position,
-                map,
-                title
-            };
+        function createMarker(position, title, pinColor, markerType = 'airport') {
+            const markerOptions = { position, map, title };
 
-            if (isDeparture) {
+            if (markerType === 'departure') {
                 markerOptions.icon = {
                     path: 'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z',
-                    fillColor: '#FFFFFF',
-                    fillOpacity: 1,
-                    strokeWeight: 1.5,
-                    strokeColor: '#000000',
-                    rotation: -45,
-                    scale: 1.3,
-                    anchor: new google.maps.Point(12, 12)
+                    fillColor: '#FFFFFF', fillOpacity: 1, strokeWeight: 1.5, strokeColor: '#000000',
+                    rotation: -45, scale: 1.3, anchor: new google.maps.Point(12, 12)
                 };
-            } else {
-                markerOptions.icon = `https://maps.google.com/mapfiles/ms/icons/${pinColor === '4caf50' ? 'green' : 'red'}-dot.png`;
-                markerOptions.label = {
-                    text: title.split('\n')[0],
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                };
+                const marker = new google.maps.Marker(markerOptions);
+                activeMarkers.push(marker);
+                return;
             }
 
+            if (markerType === 'poi') {
+                const labelColor = (pinColor === '#FFFFFF') ? 'black' : 'white';
+                markerOptions.icon = {
+                    path: 'M 0,-8 L 8,0 L 0,8 L -8,0 Z', // Diamond shape
+                    fillColor: pinColor,
+                    fillOpacity: 1,
+                    strokeColor: 'black',
+                    strokeWeight: 1,
+                    scale: 1
+                };
+                markerOptions.label = { text: title.substring(0, 3).toUpperCase(), color: labelColor, fontWeight: 'bold', fontSize: '10px' };
+                const marker = new google.maps.Marker(markerOptions);
+                activePoiMarkers.push(marker);
+                return;
+            }
+            
+            if (markerType === 'referenceCity') {
+                markerOptions.icon = {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: '#808080',
+                    fillOpacity: 0.7,
+                    strokeColor: 'white',
+                    strokeWeight: 1,
+                    scale: 7
+                };
+                markerOptions.label = { text: title, color: 'white', fontSize: '10px' };
+                const marker = new google.maps.Marker(markerOptions);
+                activeMarkers.push(marker);
+                return;
+            }
+
+            // Default case: 'airport'
+            const labelColor = (pinColor === '#FFFFFF') ? 'black' : 'white';
+            markerOptions.icon = {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: pinColor,
+                fillOpacity: 1,
+                strokeColor: 'black',
+                strokeWeight: 1.5,
+                scale: 8
+            };
+            const icaoMatch = title.match(/\((.*?)\)/);
+            if (icaoMatch && icaoMatch[1]) {
+                markerOptions.label = { 
+                    text: icaoMatch[1], 
+                    color: labelColor, 
+                    fontWeight: 'bold', 
+                    fontSize: '10px' 
+                };
+            }
             const marker = new google.maps.Marker(markerOptions);
             activeMarkers.push(marker);
-            return marker;
         }
         
-        /**
-         * Creates a label for a polygon.
-         */
         function createPolygonLabel(text, position) {
             const label = new google.maps.Marker({
-                position,
-                map,
-                label: {
-                    text: text,
-                    color: "white",
-                    fontSize: "14px",
-                    fontWeight: "bold",
-                },
-                icon: { path: 'M 0,0' },
-                clickable: false,
+                position, map,
+                label: { text, color: "white", fontSize: "14px", fontWeight: "bold" },
+                icon: { path: 'M 0,0' }, clickable: false,
             });
             activeLabels.push(label);
+            return label;
         }
 
-        /**
-         * Draws a geodesic flight arc.
-         */
         function drawFlightArc(start, end) {
             const arc = new google.maps.Polyline({
-                path: [start, end],
-                geodesic: true,
-                strokeColor: '#FFFFFF',
-                strokeOpacity: 0.7,
-                strokeWeight: 2,
-                icons: [{
-                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-                    offset: '0',
-                    repeat: '15px'
-                }],
+                path: [start, end], geodesic: true, strokeColor: '#FFFFFF', strokeOpacity: 0.7, strokeWeight: 2,
+                icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '15px' }],
             });
             arc.setMap(map);
             activeArcs.push(arc);
         }
 
-        /**
-         * Generates coordinates for a circle polygon.
-         */
         function createCirclePolygonCoords(center, radiusNm) {
-            const radiusMeters = radiusNm * 1852;
-            const points = 64;
-            const coords = [];
-            const lat = center.lat * Math.PI / 180;
-            const lng = center.lng * Math.PI / 180;
-
+            const radiusMeters = radiusNm * 1852; const points = 64; const coords = [];
+            const lat = center.lat * Math.PI / 180; const lng = center.lng * Math.PI / 180;
             for (let i = 0; i < points; i++) {
                 const theta = (i / points) * (2 * Math.PI);
                 const angularDistance = radiusMeters / 6378137;
-                
                 let pointLat = Math.asin(Math.sin(lat) * Math.cos(angularDistance) + Math.cos(lat) * Math.sin(angularDistance) * Math.cos(theta));
                 let pointLng = lng + Math.atan2(Math.sin(theta) * Math.sin(angularDistance) * Math.cos(lat), Math.cos(angularDistance) - Math.sin(lat) * Math.sin(pointLat));
-
-                pointLat = pointLat * 180 / Math.PI;
-                pointLng = pointLng * 180 / Math.PI;
-                
+                pointLat = pointLat * 180 / Math.PI; pointLng = pointLng * 180 / Math.PI;
                 coords.push({ lat: pointLat, lng: pointLng });
             }
             return coords;
         }
 
-        /**
-         * Renders the map from the JSON data.
-         */
+        function getLinePattern(aircraftNumber, color) {
+            if (aircraftNumber === 1) return null; // Solid line
+
+            const lineOptions = {
+                strokeColor: color,
+                strokeOpacity: 1,
+                strokeWeight: 2,
+            };
+
+            switch (aircraftNumber) {
+                case 2: // Dashed
+                    return [{
+                        icon: { path: 'M 0,-1 0,1', ...lineOptions, scale: 4 },
+                        offset: '0', repeat: '15px'
+                    }];
+                case 3: // Dash-Dot (Simulated with a different dash)
+                    return [{
+                        icon: { path: 'M 0,-1 0,1', ...lineOptions, scale: 4 },
+                        offset: '0', repeat: '25px'
+                    }];
+                case 4: // Dotted
+                    return [{
+                        icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, scale: 2.5, strokeOpacity: 0 },
+                        offset: '0', repeat: '10px'
+                    }];
+                default:
+                    return null;
+            }
+        }
+
+
+        function renderPois() {
+            clearPois();
+            if (!currentMapData) return;
+
+            // Get visible polygons for range checking
+            const visibleBombardierPolygons = [];
+            const visibleCompetitorPolygons = [];
+            scenarioOverlays.forEach((overlay, index) => {
+                if (overlay.polygon && overlay.polygon.getVisible()) {
+                    const scenario = currentMapData.scenarios[index];
+                    if (scenario.manufacturer === 'bombardier') {
+                        visibleBombardierPolygons.push(overlay.polygon);
+                    } else {
+                        visibleCompetitorPolygons.push(overlay.polygon);
+                    }
+                }
+            });
+
+            const poiSelection = document.getElementById('poi-selector').value;
+            const departurePosition = currentMapData.departureAirport;
+
+            const processPoiList = (poiList) => {
+                poiList.forEach(poi => {
+                    const poiPosition = new google.maps.LatLng(poi.lat, poi.lng);
+                    
+                    let pinColor;
+                    const inBombardierRange = visibleBombardierPolygons.some(p => google.maps.geometry.poly.containsLocation(poiPosition, p));
+                    const inCompetitorRange = visibleCompetitorPolygons.some(p => google.maps.geometry.poly.containsLocation(poiPosition, p));
+
+                    if (inBombardierRange) {
+                        pinColor = BRANDING.BOMBARDIER_COLOR;
+                    } else if (inCompetitorRange) {
+                        pinColor = BRANDING.COMPETITOR_COLOR;
+                    } else {
+                        pinColor = '#FFFFFF';
+                    }
+
+                    createMarker(poiPosition, poi.name, pinColor, 'poi');
+                });
+            };
+
+            if (poiSelection === 'capitals') {
+                processPoiList(continentalCapitals);
+            } else if (poiSelection === 'hotspots') {
+                processPoiList(wealthyHotspots);
+            } else if (poiSelection === 'in_range' && currentMapData.scenarios.length > 0 && departurePosition) {
+                const departureLatLng = new google.maps.LatLng(departurePosition);
+                const maxRangeNm = Math.max(...currentMapData.scenarios.map(s => s.distanceNm || 0));
+                
+                if (maxRangeNm > 0) {
+                    const lowerBoundNm = maxRangeNm - 300;
+                    const upperBoundNm = maxRangeNm + 300;
+                    const citiesInRange = majorCities.filter(city => {
+                        const cityLatLng = new google.maps.LatLng(city.lat, city.lng);
+                        const distanceToCityNm = google.maps.geometry.spherical.computeDistanceBetween(departureLatLng, cityLatLng) / 1852;
+                        return (distanceToCityNm >= lowerBoundNm && distanceToCityNm <= upperBoundNm);
+                    });
+                    processPoiList(citiesInRange);
+                }
+            }
+        }
+
         function renderMapFromJSON() {
             const jsonString = document.getElementById('json-output').value;
-            if (!jsonString) {
-                clearMap(); // Clear map if JSON is empty
-                return;
-            }
-
+            if (!jsonString) { clearMap(); return; }
             let data;
-            try {
-                data = JSON.parse(jsonString);
-            } catch (e) {
-                // Don't alert on every keystroke, just log the error
-                console.error("Invalid JSON data:", e);
-                return;
-            }
+            try { data = JSON.parse(jsonString); } catch (e) { console.error("Invalid JSON data:", e); return; }
+            currentMapData = data; // Store data globally
+
+            const scenarioVisibility = [];
+            document.querySelectorAll('.scenario-toggle').forEach(checkbox => scenarioVisibility.push(checkbox.checked));
+            const returnScenarioVisibility = [];
+            document.querySelectorAll('.scenario-return-toggle').forEach(checkbox => returnScenarioVisibility.push(checkbox.checked));
 
             clearMap();
 
             const showArcs = document.getElementById('show-flight-arcs-toggle').checked;
+            const showCities = document.getElementById('show-cities-toggle').checked;
             const bounds = new google.maps.LatLngBounds();
 
             const departureAirport = data.departureAirport;
-            if (!departureAirport || !departureAirport.lat) {
-                console.error("Departure airport data is invalid or missing.");
-                return;
-            }
+            if (!departureAirport || !departureAirport.lat) { console.error("Departure airport data is invalid."); return; }
             const departurePosition = { lat: departureAirport.lat, lng: departureAirport.lng };
+            const departureLatLng = new google.maps.LatLng(departurePosition);
             
             const assumptionsOverlay = document.getElementById('assumptions-overlay');
-            
             let assumptionsHtml = `<strong>Departure Airport:</strong> ${departureAirport.name}`;
-            if (data.takeoffAssumptions) {
-                assumptionsHtml += `<br><br><strong>Assumptions:</strong><br>${data.takeoffAssumptions}`;
-            }
+            if (data.takeoffAssumptions) { assumptionsHtml += `<br><br><strong>Assumptions:</strong><br>${data.takeoffAssumptions}`; }
             if (data.scenarios && data.scenarios.length > 0) {
                 assumptionsHtml += `<br><br><strong>Scenarios:</strong><br>`;
-                data.scenarios.forEach(scenario => {
-                    assumptionsHtml += `<div><span class="legend-color-box" style="background-color: ${scenario.color};"></span>${scenario.name}</div>`;
+                data.scenarios.forEach((scenario, index) => {
+                    const color = scenario.manufacturer === 'bombardier' ? BRANDING.BOMBARDIER_COLOR : BRANDING.COMPETITOR_COLOR;
+                    const isChecked = scenarioVisibility[index] !== false;
+                    // Line 1: Scenario Name
+                    assumptionsHtml += `
+                        <div class="scenario-legend-item mt-1">
+                            <span class="legend-color-box" style="background-color: ${color};"></span>
+                            <span class="font-semibold">${scenario.name}</span>
+                        </div>`;
+                    
+                    // Line 2: Toggles
+                    let togglesHtml = `<div class="scenario-legend-item ml-4 text-xs space-x-4">`;
+                    togglesHtml += `
+                        <label for="scenario-toggle-${index}" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="scenario-toggle-${index}" class="scenario-toggle mr-1" data-index="${index}" ${isChecked ? 'checked' : ''}>
+                            Show Range
+                        </label>`;
+
+                    if (scenario.returnDistanceNm || scenario.returnCoordinates) {
+                         const isReturnChecked = returnScenarioVisibility[index] === true;
+                         togglesHtml += `
+                            <label for="scenario-return-toggle-${index}" class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="scenario-return-toggle-${index}" class="scenario-return-toggle mr-1" data-index="${index}" ${isReturnChecked ? 'checked' : ''}>
+                                Show Return
+                            </label>`;
+                    }
+                    togglesHtml += `</div>`;
+                    assumptionsHtml += togglesHtml;
                 });
             }
             assumptionsOverlay.innerHTML = assumptionsHtml;
             assumptionsOverlay.style.display = 'block';
 
-            createMarker(departurePosition, departureAirport.name, '4caf50', true);
+            createMarker(departurePosition, departureAirport.name, null, 'departure');
             bounds.extend(departurePosition);
 
-            const allAirportPositions = [new google.maps.LatLng(departurePosition)];
-            data.destinations.forEach(airport => {
-                if (airport) allAirportPositions.push(new google.maps.LatLng(airport.lat, airport.lng));
-            });
+            const allAirportPositions = [departureLatLng];
+            data.destinations.forEach(airport => { if (airport) allAirportPositions.push(new google.maps.LatLng(airport.lat, airport.lng)); });
 
-            data.scenarios.forEach(scenario => {
-                let polygonPath;
-                if (scenario.distanceNm) {
-                    polygonPath = createCirclePolygonCoords(departurePosition, scenario.distanceNm);
-                } else if (scenario.coordinates) {
-                    polygonPath = scenario.coordinates;
-                } else return;
+            data.scenarios.forEach((scenario, index) => {
+                const color = scenario.manufacturer === 'bombardier' ? BRANDING.BOMBARDIER_COLOR : BRANDING.COMPETITOR_COLOR;
+                const linePattern = getLinePattern(scenario.aircraftNumber, color);
 
-                polygonPath.forEach(p => bounds.extend(p));
-                const polygon = new google.maps.Polygon({ paths: polygonPath, strokeColor: scenario.color, strokeOpacity: 0.8, strokeWeight: 3, fillOpacity: 0.0, map: map });
-                activePolygons.push(polygon);
+                let polygon, label, returnPolygon, returnLabel;
                 
-                let labelPosition;
-                if (scenario.distanceNm) {
-                    let bestAngle = 0, maxMinDistance = 0;
-                    for (let angle = 0; angle < 360; angle += 10) {
-                        const radiusMeters = scenario.distanceNm * 1852;
-                        const candidatePosition = google.maps.geometry.spherical.computeOffset(departurePosition, radiusMeters, angle);
-                        let minDistanceToAnyAirport = Infinity;
-                        allAirportPositions.forEach(airportPos => {
-                            const distance = google.maps.geometry.spherical.computeDistanceBetween(candidatePosition, airportPos);
-                            minDistanceToAnyAirport = Math.min(minDistanceToAnyAirport, distance);
-                        });
-                        if (minDistanceToAnyAirport > maxMinDistance) {
-                            maxMinDistance = minDistanceToAnyAirport;
-                            bestAngle = angle;
+                const createStyledPolygon = (path) => {
+                    const polyOptions = {
+                        paths: path,
+                        strokeColor: color,
+                        strokeWeight: 2,
+                        fillOpacity: 0.0, // Polygon is not shaded
+                        map: map
+                    };
+                    if (linePattern) {
+                        polyOptions.strokeOpacity = 0; // Hide base stroke
+                        polyOptions.icons = linePattern;
+                    }
+                    return new google.maps.Polygon(polyOptions);
+                };
+
+                let polygonPath;
+                if (scenario.distanceNm) polygonPath = createCirclePolygonCoords(departurePosition, scenario.distanceNm);
+                else if (scenario.coordinates) polygonPath = scenario.coordinates;
+                
+                if(polygonPath) {
+                    polygonPath.forEach(p => bounds.extend(p));
+                    polygon = createStyledPolygon(polygonPath);
+                    activePolygons.push(polygon);
+                    
+                    let bestAngle = 45;
+                    if (scenario.distanceNm) {
+                        let maxMinDistance = 0;
+                        for (let angle = 0; angle < 360; angle += 10) {
+                            const candidatePosition = google.maps.geometry.spherical.computeOffset(departurePosition, scenario.distanceNm * 1852, angle);
+                            let minDistanceToAnyAirport = Infinity;
+                            allAirportPositions.forEach(airportPos => {
+                                minDistanceToAnyAirport = Math.min(minDistanceToAnyAirport, google.maps.geometry.spherical.computeDistanceBetween(candidatePosition, airportPos));
+                            });
+                            if (minDistanceToAnyAirport > maxMinDistance) { maxMinDistance = minDistanceToAnyAirport; bestAngle = angle; }
                         }
                     }
-                    labelPosition = google.maps.geometry.spherical.computeOffset(departurePosition, scenario.distanceNm * 1852, bestAngle);
-                } else if (scenario.coordinates && scenario.coordinates.length > 0) {
-                    labelPosition = scenario.coordinates.reduce((n, c) => c.lat > n.lat ? c : n, scenario.coordinates[0]);
-                } else {
-                    labelPosition = departurePosition;
+                    const labelPosition = scenario.distanceNm ? google.maps.geometry.spherical.computeOffset(departurePosition, scenario.distanceNm * 1852, bestAngle) : polygonPath[0];
+                    label = createPolygonLabel(scenario.name, labelPosition);
                 }
-                createPolygonLabel(scenario.name, labelPosition);
+
+                let returnPolygonPath;
+                if (scenario.returnDistanceNm) returnPolygonPath = createCirclePolygonCoords(departurePosition, scenario.returnDistanceNm);
+                else if (scenario.returnCoordinates) returnPolygonPath = scenario.returnCoordinates;
+
+                if (returnPolygonPath) {
+                    returnPolygonPath.forEach(p => bounds.extend(p));
+                    returnPolygon = createStyledPolygon(returnPolygonPath);
+                    returnPolygon.setVisible(false);
+                    activePolygons.push(returnPolygon);
+                    const returnLabelPosition = returnPolygonPath[Math.floor(returnPolygonPath.length / 2)];
+                    returnLabel = createPolygonLabel(`${scenario.name} (Return)`, returnLabelPosition);
+                    returnLabel.setVisible(false);
+                }
+                
+                scenarioOverlays[index] = { polygon, label, returnPolygon, returnLabel };
+            });
+
+            scenarioOverlays.forEach((overlay, index) => {
+                const isVisible = scenarioVisibility[index] !== false;
+                if (overlay.polygon) overlay.polygon.setVisible(isVisible);
+                if (overlay.label) overlay.label.setVisible(isVisible);
+                const isReturnVisible = returnScenarioVisibility[index] === true;
+                if (overlay.returnPolygon) overlay.returnPolygon.setVisible(isReturnVisible);
+                if (overlay.returnLabel) overlay.returnLabel.setVisible(isReturnVisible);
+            });
+
+            document.querySelectorAll('.scenario-toggle').forEach(checkbox => checkbox.addEventListener('change', (e) => {
+                const i = parseInt(e.target.dataset.index), v = e.target.checked;
+                if (scenarioOverlays[i]) {
+                    if(scenarioOverlays[i].polygon) scenarioOverlays[i].polygon.setVisible(v);
+                    if(scenarioOverlays[i].label) scenarioOverlays[i].label.setVisible(v);
+                }
+            }));
+            document.querySelectorAll('.scenario-return-toggle').forEach(checkbox => checkbox.addEventListener('change', (e) => {
+                const i = parseInt(e.target.dataset.index), v = e.target.checked;
+                if (scenarioOverlays[i]) {
+                    if(scenarioOverlays[i].returnPolygon) scenarioOverlays[i].returnPolygon.setVisible(v);
+                    if(scenarioOverlays[i].returnLabel) scenarioOverlays[i].returnLabel.setVisible(v);
+                }
+            }));
+
+            const visibleBombardierPolygons = [];
+            const visibleCompetitorPolygons = [];
+            scenarioOverlays.forEach((overlay, index) => {
+                if (overlay.polygon && overlay.polygon.getVisible()) {
+                    const scenario = data.scenarios[index];
+                    if (scenario.manufacturer === 'bombardier') {
+                        visibleBombardierPolygons.push(overlay.polygon);
+                    } else {
+                        visibleCompetitorPolygons.push(overlay.polygon);
+                    }
+                }
             });
 
             data.destinations.forEach(airport => {
                 if (!airport) return;
-                
                 const airportPosition = new google.maps.LatLng(airport.lat, airport.lng);
                 bounds.extend(airportPosition);
-                
-                const distanceMeters = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(departurePosition), airportPosition);
-                const distanceNM = (distanceMeters / 1852).toFixed(0);
+                const distanceNM = (google.maps.geometry.spherical.computeDistanceBetween(departureLatLng, airportPosition) / 1852).toFixed(0);
                 const tooltipTitle = `${airport.name} (${airport.icao})\n${distanceNM} NM`;
+                
+                let pinColor;
+                const inBombardierRange = visibleBombardierPolygons.some(p => google.maps.geometry.poly.containsLocation(airportPosition, p));
+                const inCompetitorRange = visibleCompetitorPolygons.some(p => google.maps.geometry.poly.containsLocation(airportPosition, p));
 
-                const isInRange = activePolygons.some(polygon => google.maps.geometry.poly.containsLocation(airportPosition, polygon));
-                const pinColor = isInRange ? '4caf50' : 'f44336';
-                createMarker(airportPosition, tooltipTitle, pinColor);
-
-                if (isInRange && showArcs) {
-                    drawFlightArc(departurePosition, airportPosition);
+                if (inBombardierRange) {
+                    pinColor = BRANDING.BOMBARDIER_COLOR;
+                } else if (inCompetitorRange) {
+                    pinColor = BRANDING.COMPETITOR_COLOR;
+                } else {
+                    pinColor = '#FFFFFF';
                 }
+
+                createMarker(airportPosition, tooltipTitle, pinColor, 'airport');
+                if ((inBombardierRange || inCompetitorRange) && showArcs) { drawFlightArc(departurePosition, airportPosition); }
             });
 
             map.fitBounds(bounds);
             google.maps.event.addListenerOnce(map, 'idle', () => {
                 if (map.getZoom() < 2) map.setZoom(2);
                 map.setCenter(departurePosition);
+
+                if (showCities) {
+                    const currentBounds = map.getBounds();
+                    let airportVisible = currentBounds.contains(departurePosition) || data.destinations.some(a => a && currentBounds.contains({lat: a.lat, lng: a.lng}));
+                    if (!airportVisible) {
+                        let closestCity = null; let minDistance = Infinity; const mapCenter = map.getCenter();
+                        majorCities.forEach(city => {
+                            const d = google.maps.geometry.spherical.computeDistanceBetween(mapCenter, new google.maps.LatLng(city.lat, city.lng));
+                            if (d < minDistance) { minDistance = d; closestCity = city; }
+                        });
+                        if (closestCity) { createMarker(closestCity, closestCity.name, 'gray', 'referenceCity'); }
+                    }
+                }
+                renderPois(); // Render initial POIs
             });
         }
 
-        /**
-         * Dynamically adds a new scenario input group.
-         */
         function addScenarioInput() {
             const container = document.getElementById('scenarios-container');
             const newScenario = document.createElement('div');
             newScenario.className = 'p-2 border rounded-lg bg-gray-50 scenario-item';
             newScenario.innerHTML = `
                 <div class="grid grid-cols-2 gap-2">
-                    <input type="text" class="p-1.5 text-sm border rounded-md col-span-2" placeholder="Scenario Name">
-                    <input type="number" class="p-1.5 text-sm border rounded-md" placeholder="Distance (NM)">
-                    <input type="color" class="p-1 h-8 w-full block bg-white border border-gray-200 cursor-pointer rounded-lg" value="#FF0000">
+                    <input type="text" class="scenario-name p-1.5 text-sm border rounded-md col-span-2" placeholder="e.g., Bombardier Global">
+                    <input type="number" class="departure-distance p-1.5 text-sm border rounded-md col-span-2" placeholder="Distance (NM)">
                 </div>
-                <textarea class="w-full p-1.5 mt-2 border rounded-md text-xs font-mono" rows="2" placeholder="Or paste coordinates: [{lat:..., lng:...}, ...]"></textarea>
+                <textarea class="departure-coords w-full p-1.5 mt-2 border rounded-md text-xs font-mono" rows="2" placeholder="Or paste departure coordinates..."></textarea>
+                <div class="mt-2 pt-2 border-t">
+                     <p class="text-xs text-gray-500 mb-1">Optional Return Range</p>
+                     <div class="grid grid-cols-2 gap-2">
+                         <input type="number" class="return-distance p-1.5 text-sm border rounded-md col-span-2" placeholder="Return Dist (NM)">
+                     </div>
+                     <textarea class="return-coords w-full p-1.5 mt-2 border rounded-md text-xs font-mono" rows="2" placeholder="Or paste return coordinates..."></textarea>
+                </div>
                 <button class="remove-scenario-btn text-red-500 hover:text-red-700 text-xs mt-1">Remove</button>
             `;
             container.appendChild(newScenario);
             newScenario.querySelector('.remove-scenario-btn').addEventListener('click', () => newScenario.remove());
         }
         
-        /**
-         * Gathers data from the form, looks up airport details, and generates the JSON.
-         */
         function generateJsonFromForm() {
             const departureIcao = document.getElementById('departure-icao').value.toUpperCase();
             const departureAirportData = airportDatabase[departureIcao];
-
-            if (!departureAirportData) {
-                alert(`Departure airport '${departureIcao}' not found. Please use a valid 4-letter ICAO code from the demo list.`);
-                return;
-            }
+            if (!departureAirportData) { alert(`Departure airport '${departureIcao}' not found.`); return; }
 
             const takeoffAssumptions = document.getElementById('takeoff-assumptions').value;
             const destinationIcaos = document.getElementById('destination-icaos').value.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
@@ -512,60 +734,67 @@
             const notFoundDestinations = [];
             const destinations = destinationIcaos.map(icao => {
                 const airportData = airportDatabase[icao];
-                if (!airportData) {
-                    notFoundDestinations.push(icao);
-                    return null;
-                }
+                if (!airportData) { notFoundDestinations.push(icao); return null; }
                 return { icao, ...airportData };
             }).filter(d => d !== null);
+            if (notFoundDestinations.length > 0) { alert(`Destinations not found: ${notFoundDestinations.join(', ')}`); }
 
-            if (notFoundDestinations.length > 0) {
-                alert(`The following destination airports were not found and have been skipped: ${notFoundDestinations.join(', ')}`);
-            }
+            let bombardierCounter = 0;
+            let competitorCounter = 0;
 
             const scenarios = Array.from(document.querySelectorAll('.scenario-item')).map(item => {
-                const name = item.querySelector('input[type="text"]').value;
-                const distance = item.querySelector('input[type="number"]').value;
-                const color = item.querySelector('input[type="color"]').value;
-                const coordsText = item.querySelector('textarea').value;
-                const scenario = { name, color };
-                if (coordsText) {
-                    try { scenario.coordinates = JSON.parse(coordsText); } catch (e) { console.warn('Could not parse coordinates for scenario:', name); }
-                } else if (distance) {
-                    scenario.distanceNm = parseFloat(distance);
+                const name = item.querySelector('.scenario-name').value;
+                const isBombardier = name.toLowerCase().includes('bombardier');
+                
+                let aircraftNumber;
+                if (isBombardier) {
+                    bombardierCounter++;
+                    aircraftNumber = bombardierCounter;
+                } else {
+                    competitorCounter++;
+                    aircraftNumber = competitorCounter;
                 }
+                
+                const scenario = {
+                    name: name,
+                    manufacturer: isBombardier ? 'bombardier' : 'competitor',
+                    aircraftNumber: aircraftNumber,
+                };
+
+                const distance = item.querySelector('.departure-distance').value;
+                const coordsText = item.querySelector('.departure-coords').value;
+                if (coordsText) { try { scenario.coordinates = JSON.parse(coordsText); } catch (e) { console.warn('Could not parse departure coordinates for scenario:', scenario.name); }
+                } else if (distance) { scenario.distanceNm = parseFloat(distance); }
+
+                const returnDistance = item.querySelector('.return-distance').value;
+                const returnCoordsText = item.querySelector('.return-coords').value;
+                if (returnCoordsText) { try { scenario.returnCoordinates = JSON.parse(returnCoordsText); } catch (e) { console.warn('Could not parse return coordinates for scenario:', scenario.name); }
+                } else if (returnDistance) { scenario.returnDistanceNm = parseFloat(returnDistance); }
+
                 return scenario;
             });
 
             const outputData = { 
                 departureAirport: { icao: departureIcao, ...departureAirportData }, 
-                takeoffAssumptions, 
-                scenarios, 
-                destinations 
+                takeoffAssumptions, scenarios, destinations 
             };
             document.getElementById('json-output').value = JSON.stringify(outputData, null, 2);
-            
-            // Trigger the map render after generating the JSON
             renderMapFromJSON();
         }
 
         // --- EVENT LISTENERS ---
-
         document.addEventListener('DOMContentLoaded', () => {
             addScenarioInput(); 
-            
             document.getElementById('add-scenario-btn').addEventListener('click', addScenarioInput);
             document.getElementById('generate-json-btn').addEventListener('click', generateJsonFromForm);
-            
-            // Re-render map on any change to the JSON text area
             document.getElementById('json-output').addEventListener('input', renderMapFromJSON);
+            document.getElementById('poi-selector').addEventListener('change', renderPois); 
 
             const togglePanelBtn = document.getElementById('toggle-panel-btn');
             const controlPanel = document.getElementById('control-panel');
             const mapContainer = document.getElementById('map-container');
             const iconHide = document.getElementById('toggle-icon-hide');
             const iconShow = document.getElementById('toggle-icon-show');
-
             togglePanelBtn.addEventListener('click', () => {
                 controlPanel.classList.toggle('hidden');
                 iconHide.classList.toggle('hidden');
@@ -575,7 +804,6 @@
                 setTimeout(() => { if (map) google.maps.event.trigger(map, 'resize'); }, 300); 
             });
 
-            // Help Section Toggle
             const helpButton = document.getElementById('help-button');
             const helpContent = document.getElementById('help-content');
             const helpCaret = document.getElementById('help-caret');
@@ -585,14 +813,15 @@
             });
 
             document.getElementById('departure-icao').value = 'KJFK';
-            document.getElementById('destination-icaos').value = 'KLAX,EGLL,KORD,EHAM,RJAA,OMDB,YSSY,SBGR,FAOR';
+            document.getElementById('destination-icaos').value = 'KLAX,EGLL,KORD';
             const firstScenario = document.querySelector('.scenario-item');
-            firstScenario.querySelector('input[type="text"]').value = 'Max Range';
-            firstScenario.querySelector('input[type="number"]').value = '3000';
-            firstScenario.querySelector('input[type="color"]').value = '#3b82f6';
+            firstScenario.querySelector('.scenario-name').value = 'Bombardier Global';
+            firstScenario.querySelector('.departure-distance').value = '3000';
+            firstScenario.querySelector('.return-distance').value = '1500';
         });
     </script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBenOVcAKFVKwwM66oGwPd_CSFX_vBq3_A&callback=initMap&libraries=geometry"></script>
 
 </body>
 </html>
+
